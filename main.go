@@ -39,7 +39,7 @@ type Config struct {
 	uploading bool
 }
 
-func getConfig() Config {
+func getConfig() (Config, error) {
 	conf := Config{
 		downloads: 1,
 		port: 8008,
@@ -61,7 +61,11 @@ func getConfig() Config {
 	conf.filePath = flag.Arg(0)
 	conf.fileName = path.Base(conf.filePath)
 
-	return conf
+	if conf.filePath == "" && !conf.uploading {
+		return conf, errors.New("no file provided to download")
+	}
+
+	return conf, nil
 }
 
 func getIP() (string, error) {
@@ -79,7 +83,11 @@ func getIP() (string, error) {
 }
 
 func main() {
-	conf := getConfig()
+	conf, err := getConfig()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	server := &http.Server{
 		Addr: fmt.Sprintf(":%v", conf.port),
@@ -96,7 +104,7 @@ func main() {
 	ip, err := getIP()
 	if err != nil {
 		fmt.Println(err)
-		return
+		os.Exit(1)
 	}
 
 	url := fmt.Sprintf("http://%s:%v/%s", ip, conf.port, conf.fileName)
@@ -108,7 +116,7 @@ func main() {
 	err = server.ListenAndServe()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fmt.Println(err)
-		return
+		os.Exit(1)
 	}
 }
 
