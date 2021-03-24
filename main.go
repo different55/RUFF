@@ -86,6 +86,8 @@ func getIP() (string, error) {
 	return localAddr.IP.String(), nil
 }
 
+var done = make(chan struct{})
+
 func main() {
 	conf, err := getConfig()
 	if err != nil {
@@ -122,6 +124,12 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	
+	// Wait for the server to finish any transfers, up to 3 seconds
+	select {
+		case <-done:
+		case <-time.After(3*time.Second):
+	}
 }
 
 func setupDownload(server *http.Server, conf Config) {
@@ -133,7 +141,7 @@ func setupDownload(server *http.Server, conf Config) {
 		
 		downloads--
 		if downloads == 0 {
-			server.Shutdown(context.Background())
+			go shutdown(server)
 		}
 	})
 }
@@ -213,6 +221,11 @@ func setupUpload(server *http.Server, conf Config) {
 		}
 
 		tpl.ExecuteTemplate(w, "UploadMessage", "Upload successful!")
-		server.Shutdown(context.Background())
+		go shutdown(server)
 	})
+}
+
+func shutdown(server *http.Server) {
+	server.Shutdown(context.Background())
+	done <- struct{}{}
 }
