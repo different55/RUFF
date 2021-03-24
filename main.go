@@ -155,9 +155,17 @@ var baseHeader = `<!DOCTYPE html>
 		<title>{{.}}</title>
 		<style>
 			body {
-				margin: 18pt auto;
-				font-size: 16pt;
+				padding: 18pt;
+				text-align: center;
+				font: 16pt monospace;
 				color: #212121;
+			}
+			form {
+				display: inline-block;
+				text-align: left;
+			}
+			input {
+				font: inherit;
 			}
 		</style>
 	</head>
@@ -168,7 +176,7 @@ var baseFooter = `</body>
 
 var uploadTemplate = `{{template "BaseHeader" "RUFF - Upload Form"}}
 		<form enctype="multipart/form-data" action="/" method="post">
-			<label for="file">Select a file for upload:</label>
+			<label for="file">Select a file for upload:</label><br><br>
 			<input type="file" name="file">
 			<input type="submit" value="Upload"{{if .Multiple}} multiple{{end}}>
 		</form>
