@@ -159,7 +159,7 @@ var uploadTemplate = `{{template "BaseHeader" "RUFF Upload Form"}}
 		</form>
 {{template "BaseFooter"}}`
 
-var errorTemplate = `{{template "BaseHeader" "UploadError"}}
+var errorTemplate = `{{template "BaseHeader" "Upload Error"}}
 		<p>{{.}}</p>
 		<p><a href="/">Go back</a></p>
 {{template "BaseFooter"}}`
