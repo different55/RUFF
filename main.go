@@ -155,7 +155,7 @@ var baseHeader = `<!DOCTYPE html>
 var baseFooter = `</body>
 </html>`
 
-var uploadTemplate = `{{template "BaseHeader" "RUFF Upload Form"}}
+var uploadTemplate = `{{template "BaseHeader" "RUFF - Upload Form"}}
 		<form enctype="multipart/form-data" action="/" method="post">
 			<label for="file">Select a file for upload:</label>
 			<input type="file" name="file">
@@ -163,9 +163,13 @@ var uploadTemplate = `{{template "BaseHeader" "RUFF Upload Form"}}
 		</form>
 {{template "BaseFooter"}}`
 
-var errorTemplate = `{{template "BaseHeader" "Upload Error"}}
+var errorTemplate = `{{template "BaseHeader" "RUFF - Upload Error"}}
 		<p>{{.}}</p>
 		<p><a href="/">Go back</a></p>
+{{template "BaseFooter"}}`
+
+var messageTemplate = `{{template "BaseHeader" (print "RUFF - " .)}}
+		<p>{{.}}</p>
 {{template "BaseFooter"}}`
 
 func setupUpload(server *http.Server, conf Config) {
@@ -173,6 +177,7 @@ func setupUpload(server *http.Server, conf Config) {
 	template.Must(tpl.New("BaseFooter").Parse(baseFooter))
 	template.Must(tpl.New("UploadForm").Parse(uploadTemplate))
 	template.Must(tpl.New("UploadError").Parse(errorTemplate))
+	template.Must(tpl.New("UploadMessage").Parse(messageTemplate))
 	
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Upload form
@@ -206,5 +211,8 @@ func setupUpload(server *http.Server, conf Config) {
 			tpl.ExecuteTemplate(w, "UploadError", err)
 			return
 		}
+
+		tpl.ExecuteTemplate(w, "UploadMessage", "Upload successful!")
+		server.Shutdown(context.Background())
 	})
 }
