@@ -114,6 +114,9 @@ func main() {
 	}
 
 	url := fmt.Sprintf("http://%s:%v/%s", ip, conf.Port, conf.FileName)
+	if conf.Uploading {
+		url = fmt.Sprintf("http://%s:%v", ip, conf.Port)
+	}
 	if !conf.HideQR {
 		qrterminal.GenerateHalfBlock(url, qrterminal.M, os.Stdout)
 	}
