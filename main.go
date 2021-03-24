@@ -1,8 +1,8 @@
 // Ruff provides a pop-up web server to Retrieve/Upload Files Fast over
 // LAN, inspired by WOOF (Web Offer One File) by Simon Budig.
 // 
-// It's based on the principle that not everyone has <insert neat file transfer
-// utility here>, just about every device that can network has an HTTP client,
+// It's based on the idea that not every device has <insert neat file transfer
+// tool here>, but just about every device that can network has an HTTP client,
 // making a hyper-simple HTTP server a viable option for file transfer with
 // zero notice or setup as long as *somebody* has a copy of RUFF.
 //
