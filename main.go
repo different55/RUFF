@@ -31,37 +31,41 @@ import (
 
 // Config stores all settings for an instance of RUFF.
 type Config struct {
-	downloads int
-	port int
-	filePath string
-	fileName string
-	hideQR bool
-	uploading bool
+	Downloads int
+	Port int
+	FilePath string
+	FileName string
+	HideQR bool
+	Uploading bool
+	Multiple bool
 }
 
 func getConfig() (Config, error) {
 	conf := Config{
-		downloads: 1,
-		port: 8008,
-		hideQR: false,
-		uploading: false,
+		Downloads: 1,
+		Port: 8008,
+		HideQR: false,
+		Uploading: false,
+		Multiple: true,
 	}
 	
-	flag.IntVar(&conf.downloads, "count", conf.downloads, "number of downloads before exiting. set to -1 for unlimited downloads.")
-	flag.IntVar(&conf.port, "port", conf.port, "port to serve file on.")
-	flag.BoolVar(&conf.hideQR, "hide-qr", conf.hideQR, "hide the QR code.")
-	flag.BoolVar(&conf.uploading, "upload", false, "upload files instead of downloading")
+	flag.IntVar(&conf.Downloads, "count", conf.Downloads, "number of downloads before exiting. set to -1 for unlimited downloads.")
+	flag.IntVar(&conf.Port, "port", conf.Port, "port to serve file on.")
+	flag.BoolVar(&conf.HideQR, "hide-qr", conf.HideQR, "hide the QR code.")
+	flag.BoolVar(&conf.Uploading, "upload", false, "upload files instead of downloading")
+	flag.BoolVar(&conf.Multiple, "multiple", conf.Multiple, "allow uploading multiple files at once")
 	
-	flag.IntVar(&conf.downloads, "c", conf.downloads, "number of downloads before exiting. set to -1 for unlimited downloads. (shorthand)")
-	flag.IntVar(&conf.port, "p", conf.port, "port to serve file on. (shorthand)")
-	flag.BoolVar(&conf.hideQR, "q", conf.hideQR, "hide the QR code. (shorthand)")
-	flag.BoolVar(&conf.uploading, "u", false, "upload files instead of downloading (shorthand)")
+	flag.IntVar(&conf.Downloads, "c", conf.Downloads, "number of downloads before exiting. set to -1 for unlimited downloads. (shorthand)")
+	flag.IntVar(&conf.Port, "p", conf.Port, "port to serve file on. (shorthand)")
+	flag.BoolVar(&conf.HideQR, "q", conf.HideQR, "hide the QR code. (shorthand)")
+	flag.BoolVar(&conf.Uploading, "u", false, "upload files instead of downloading (shorthand)")
+	flag.BoolVar(&conf.Multiple, "m", conf.Multiple, "allow uploading multiple files at once (shorthand)")
 
 	flag.Parse()
-	conf.filePath = flag.Arg(0)
-	conf.fileName = path.Base(conf.filePath)
+	conf.FilePath = flag.Arg(0)
+	conf.FileName = path.Base(conf.FilePath)
 
-	if conf.filePath == "" && !conf.uploading {
+	if conf.FilePath == "" && !conf.Uploading {
 		return conf, errors.New("no file provided to download")
 	}
 
@@ -90,15 +94,15 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr: fmt.Sprintf(":%v", conf.port),
+		Addr: fmt.Sprintf(":%v", conf.Port),
 		ReadTimeout: 10*time.Second,
 		WriteTimeout: 10*time.Second,
 	}
 
-	if conf.uploading {
-		setupUpload(server, &conf)
+	if conf.Uploading {
+		setupUpload(server, conf)
 	} else {
-		setupDownload(server, &conf)
+		setupDownload(server, conf)
 	}
 
 	ip, err := getIP()
@@ -107,8 +111,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	url := fmt.Sprintf("http://%s:%v/%s", ip, conf.port, conf.fileName)
-	if !conf.hideQR {
+	url := fmt.Sprintf("http://%s:%v/%s", ip, conf.Port, conf.FileName)
+	if !conf.HideQR {
 		qrterminal.GenerateHalfBlock(url, qrterminal.M, os.Stdout)
 	}
 	fmt.Println(url)
@@ -120,12 +124,12 @@ func main() {
 	}
 }
 
-func setupDownload(server *http.Server, conf *Config) {
-	downloads := conf.downloads
-	http.Handle("/", http.RedirectHandler("/"+conf.fileName, http.StatusFound)) // 302 redirect
-	http.HandleFunc("/"+conf.fileName, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+url.PathEscape(conf.fileName)+"\"")
-		http.ServeFile(w, r, conf.filePath)
+func setupDownload(server *http.Server, conf Config) {
+	downloads := conf.Downloads
+	http.Handle("/", http.RedirectHandler("/"+conf.FileName, http.StatusFound)) // 302 redirect
+	http.HandleFunc("/"+conf.FileName, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+url.PathEscape(conf.FileName)+"\"")
+		http.ServeFile(w, r, conf.FilePath)
 		
 		downloads--
 		if downloads == 0 {
@@ -155,7 +159,7 @@ var uploadTemplate = `{{template "BaseHeader" "RUFF Upload Form"}}
 		<form enctype="multipart/form-data" action="/" method="post">
 			<label for="file">Select a file for upload:</label>
 			<input type="file" name="file">
-			<input type="submit" value="Upload"{{if .multiple}} multiple{{end}}>
+			<input type="submit" value="Upload"{{if .Multiple}} multiple{{end}}>
 		</form>
 {{template "BaseFooter"}}`
 
@@ -164,7 +168,7 @@ var errorTemplate = `{{template "BaseHeader" "Upload Error"}}
 		<p><a href="/">Go back</a></p>
 {{template "BaseFooter"}}`
 
-func setupUpload(server *http.Server, conf *Config) {
+func setupUpload(server *http.Server, conf Config) {
 	tpl := template.Must(template.New("BaseHeader").Parse(baseHeader))
 	template.Must(tpl.New("BaseFooter").Parse(baseFooter))
 	template.Must(tpl.New("UploadForm").Parse(uploadTemplate))
