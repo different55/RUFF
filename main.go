@@ -158,12 +158,17 @@ func main() {
 
 // setupDownload sets up the HTTP server for sending a file to a remote device.
 func setupDownload(server *http.Server, conf Config) {
-	http.Handle("/", http.RedirectHandler("/"+conf.FileName, http.StatusFound)) // 302 redirect
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("Incoming request: %v: %v %v %v\n", r.RemoteAddr, r.Proto, r.Method, r.URL)
+		// 303 redirect to real file.
+		http.RedirectHandler("/"+conf.FileName, http.StatusSeeOther).ServeHTTP(w, r)
+	})
 
 	downloads := conf.Downloads
 	http.HandleFunc("/"+conf.FileName, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+url.PathEscape(conf.FileName)+"\"")
+		fmt.Printf("Incoming request: %v: %v %v %v\n", r.RemoteAddr, r.Proto, r.Method, r.URL)
 
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+url.PathEscape(conf.FileName)+"\"")
 		// http.ServeFile handles all the nitty gritty details of hauling the file
 		// off, but maybe it shouldn't? ServeFile does content ranges and I really
 		// don't see that working with limited download counts unless we reimplement
@@ -232,6 +237,8 @@ func setupUpload(server *http.Server, conf Config) {
 	template.Must(tpl.New("UploadMessage").Parse(messageTemplate))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("Incoming request: %v: %v %v %v\n", r.RemoteAddr, r.Proto, r.Method, r.URL)
+
 		// Display upload form
 		if r.Method != http.MethodPost {
 			err := tpl.ExecuteTemplate(w, "UploadForm", conf)
@@ -294,6 +301,7 @@ func saveFile(header *multipart.FileHeader) error {
 		return err
 	}
 
+	fmt.Printf("Received file: %v\n", header.Filename)
 	return nil
 }
 
