@@ -38,15 +38,23 @@ import (
 
 // Config stores all settings for an instance of RUFF.
 type Config struct {
+	// Number of downloads to allow before exiting.
 	Downloads int
+	// Port to use for the web server.
 	Port      int
+	// Path to the file being sent.
 	FilePath  string
+	// Name of the file being sent.
 	FileName  string
+	// Hide the QR code of the final URL.
 	HideQR    bool
+	// Start RUFF in upload mode, offering up an upload form instead of a file.
 	Uploading bool
+	// Allow uploads with multiple files selected.
 	Multiple  bool
 }
 
+// getConfig fills in a Config struct based on the command line arguments.
 func getConfig() (Config, error) {
 	conf := Config{
 		Downloads: 1,
@@ -79,6 +87,10 @@ func getConfig() (Config, error) {
 	return conf, nil
 }
 
+// getIP uses the net package to try and determine the local address of the
+// device it's running on.
+//
+// Note: no actual connections are made, just prepared.
 func getIP() (string, error) {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
@@ -93,6 +105,8 @@ func getIP() (string, error) {
 	return localAddr.IP.String(), nil
 }
 
+// done is used to signal that the HTTP server has finished gracefully
+// shutting down.
 var done = make(chan struct{})
 
 func main() {
@@ -142,11 +156,18 @@ func main() {
 	}
 }
 
+// setupDownload sets up the HTTP server for sending a file to a remote device.
 func setupDownload(server *http.Server, conf Config) {
-	downloads := conf.Downloads
 	http.Handle("/", http.RedirectHandler("/"+conf.FileName, http.StatusFound)) // 302 redirect
+
+	downloads := conf.Downloads
 	http.HandleFunc("/"+conf.FileName, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+url.PathEscape(conf.FileName)+"\"")
+
+		// http.ServeFile handles all the nitty gritty details of hauling the file
+		// off, but maybe it shouldn't? ServeFile does content ranges and I really
+		// don't see that working with limited download counts unless we reimplement
+		// all that logic ourselves.
 		http.ServeFile(w, r, conf.FilePath)
 
 		downloads--
@@ -198,6 +219,11 @@ var messageTemplate = `{{template "BaseHeader" (print "RUFF - " .)}}
 		<p>{{.}}</p>
 {{template "BaseFooter"}}`
 
+// setupUpload sets up the HTTP server for receiving a file from another device
+// through an upload form and a small stack of templates.
+//
+// When go1.16 gets more widespread maybe I'll hack the templates off into
+// their own files.
 func setupUpload(server *http.Server, conf Config) {
 	tpl := template.Must(template.New("BaseHeader").Parse(baseHeader))
 	template.Must(tpl.New("BaseFooter").Parse(baseFooter))
@@ -206,7 +232,7 @@ func setupUpload(server *http.Server, conf Config) {
 	template.Must(tpl.New("UploadMessage").Parse(messageTemplate))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Upload form
+		// Display upload form
 		if r.Method != http.MethodPost {
 			err := tpl.ExecuteTemplate(w, "UploadForm", conf)
 			if err != nil {
@@ -215,9 +241,12 @@ func setupUpload(server *http.Server, conf Config) {
 			return
 		}
 
-		// Handle upload
-		r.ParseMultipartForm(20 << 20) // Buffer a maximum of 20MB in memory.
+		// Handle POSTed upload
+		// Buffer a maximum of 20MB of form data in memory.
+		r.ParseMultipartForm(20 << 20)
 
+		// Collect all files from the form.
+		// They're stored in a map of slices of file headers.
 		files := make([]*multipart.FileHeader, 0, 1)
 		for _, field := range r.MultipartForm.File {
 			for _, header := range field {
@@ -244,6 +273,7 @@ func setupUpload(server *http.Server, conf Config) {
 	})
 }
 
+// saveFile saves a fileHeader to the current working directory.
 func saveFile(header *multipart.FileHeader) error {
 	inFile, err := header.Open()
 	if err != nil {
@@ -252,6 +282,8 @@ func saveFile(header *multipart.FileHeader) error {
 	defer inFile.Close()
 
 	outFile, err := os.Create(header.Filename)
+	// TODO: This might fail if the file already exists, we should handle this
+	// case specially.
 	if err != nil {
 		return err
 	}
@@ -265,6 +297,7 @@ func saveFile(header *multipart.FileHeader) error {
 	return nil
 }
 
+// shutdown shuts down the HTTP server, sending a signal when it's complete.
 func shutdown(server *http.Server) {
 	server.Shutdown(context.Background())
 	done <- struct{}{}
