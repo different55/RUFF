@@ -184,8 +184,8 @@ var baseFooter = `</body>
 var uploadTemplate = `{{template "BaseHeader" "RUFF - Upload Form"}}
 		<form enctype="multipart/form-data" action="/" method="post">
 			<label for="file">Select a file for upload:</label><br><br>
-			<input type="file" name="file">
-			<input type="submit" value="Upload"{{if .Multiple}} multiple{{end}}>
+			<input type="file" name="file"{{if .Multiple}} multiple{{end}}>
+			<input type="submit" value="Upload">
 		</form>
 {{template "BaseFooter"}}`
 
