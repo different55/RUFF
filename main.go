@@ -1,6 +1,6 @@
 // Ruff provides a pop-up web server to Retrieve/Upload Files Fast over
 // LAN, inspired by WOOF (Web Offer One File) by Simon Budig.
-// 
+//
 // It's based on the idea that not every device has <insert neat file transfer
 // tool here>, but just about every device that can network has an HTTP client,
 // making a hyper-simple HTTP server a viable option for file transfer with
@@ -18,50 +18,50 @@
 package main
 
 import (
-	"net"
-	"net/url"
-	"net/http"
-	"time"
 	"context"
 	"html/template"
-	
-	"path"
-	"os"
-	"mime/multipart"
-	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"time"
 
-	"fmt"
-	"flag"
+	"io"
+	"mime/multipart"
+	"os"
+	"path"
+
 	"errors"
+	"flag"
+	"fmt"
 	"github.com/mdp/qrterminal"
 )
 
 // Config stores all settings for an instance of RUFF.
 type Config struct {
 	Downloads int
-	Port int
-	FilePath string
-	FileName string
-	HideQR bool
+	Port      int
+	FilePath  string
+	FileName  string
+	HideQR    bool
 	Uploading bool
-	Multiple bool
+	Multiple  bool
 }
 
 func getConfig() (Config, error) {
 	conf := Config{
 		Downloads: 1,
-		Port: 8008,
-		HideQR: false,
+		Port:      8008,
+		HideQR:    false,
 		Uploading: false,
-		Multiple: true,
+		Multiple:  true,
 	}
-	
+
 	flag.IntVar(&conf.Downloads, "count", conf.Downloads, "number of downloads before exiting. set to -1 for unlimited downloads.")
 	flag.IntVar(&conf.Port, "port", conf.Port, "port to serve file on.")
 	flag.BoolVar(&conf.HideQR, "hide-qr", conf.HideQR, "hide the QR code.")
 	flag.BoolVar(&conf.Uploading, "upload", false, "upload files instead of downloading")
 	flag.BoolVar(&conf.Multiple, "multiple", conf.Multiple, "allow uploading multiple files at once")
-	
+
 	flag.IntVar(&conf.Downloads, "c", conf.Downloads, "number of downloads before exiting. set to -1 for unlimited downloads. (shorthand)")
 	flag.IntVar(&conf.Port, "p", conf.Port, "port to serve file on. (shorthand)")
 	flag.BoolVar(&conf.HideQR, "q", conf.HideQR, "hide the QR code. (shorthand)")
@@ -89,7 +89,7 @@ func getIP() (string, error) {
 	if !ok {
 		return "", err
 	}
-	
+
 	return localAddr.IP.String(), nil
 }
 
@@ -103,9 +103,9 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr: fmt.Sprintf(":%v", conf.Port),
-		ReadTimeout: 10*time.Second,
-		WriteTimeout: 10*time.Second,
+		Addr:         fmt.Sprintf(":%v", conf.Port),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 
 	if conf.Uploading {
@@ -134,11 +134,11 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	
+
 	// Wait for the server to finish any transfers, up to 3 seconds
 	select {
-		case <-done:
-		case <-time.After(3*time.Second):
+	case <-done:
+	case <-time.After(3 * time.Second):
 	}
 }
 
@@ -148,7 +148,7 @@ func setupDownload(server *http.Server, conf Config) {
 	http.HandleFunc("/"+conf.FileName, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+url.PathEscape(conf.FileName)+"\"")
 		http.ServeFile(w, r, conf.FilePath)
-		
+
 		downloads--
 		if downloads == 0 {
 			go shutdown(server)
@@ -204,7 +204,7 @@ func setupUpload(server *http.Server, conf Config) {
 	template.Must(tpl.New("UploadForm").Parse(uploadTemplate))
 	template.Must(tpl.New("UploadError").Parse(errorTemplate))
 	template.Must(tpl.New("UploadMessage").Parse(messageTemplate))
-	
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Upload form
 		if r.Method != http.MethodPost {
@@ -217,7 +217,7 @@ func setupUpload(server *http.Server, conf Config) {
 
 		// Handle upload
 		r.ParseMultipartForm(20 << 20) // Buffer a maximum of 20MB in memory.
-		
+
 		files := make([]*multipart.FileHeader, 0, 1)
 		for _, field := range r.MultipartForm.File {
 			for _, header := range field {
@@ -238,7 +238,7 @@ func setupUpload(server *http.Server, conf Config) {
 				return
 			}
 		}
-		
+
 		tpl.ExecuteTemplate(w, "UploadMessage", "Upload successful!")
 		go shutdown(server)
 	})
@@ -250,7 +250,7 @@ func saveFile(header *multipart.FileHeader) error {
 		return err
 	}
 	defer inFile.Close()
-	
+
 	outFile, err := os.Create(header.Filename)
 	if err != nil {
 		return err
