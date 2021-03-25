@@ -27,6 +27,7 @@ import (
 	
 	"path"
 	"os"
+	"mime/multipart"
 	"io"
 
 	"fmt"
@@ -217,29 +218,51 @@ func setupUpload(server *http.Server, conf Config) {
 		// Handle upload
 		r.ParseMultipartForm(20 << 20) // Buffer a maximum of 20MB in memory.
 		
-		inFile, header, err := r.FormFile("file")
-		if err != nil {
-			tpl.ExecuteTemplate(w, "UploadError", err)
-			return
-		}
-		defer inFile.Close()
-
-		outFile, err := os.Create(header.Filename)
-		if err != nil {
-			tpl.ExecuteTemplate(w, "UploadError", err)
-			return
-		}
-		defer outFile.Close()
-
-		_, err = io.Copy(outFile, inFile)
-		if err != nil {
-			tpl.ExecuteTemplate(w, "UploadError", err)
-			return
+		files := make([]*multipart.FileHeader, 0, 1)
+		for _, field := range r.MultipartForm.File {
+			for _, header := range field {
+				// Make sure there's only one file if we only expect one.
+				if len(files) > 0 && !conf.Multiple {
+					tpl.ExecuteTemplate(w, "UploadError", "multiple files found, only expected one file. start RUFF with -m for multiple file uploads.")
+					return
+				}
+				files = append(files, header)
+			}
 		}
 
+		// Save all files to disk.
+		for i := range files {
+			err := saveFile(files[i])
+			if err != nil {
+				tpl.ExecuteTemplate(w, "UploadError", err)
+				return
+			}
+		}
+		
 		tpl.ExecuteTemplate(w, "UploadMessage", "Upload successful!")
 		go shutdown(server)
 	})
+}
+
+func saveFile(header *multipart.FileHeader) error {
+	inFile, err := header.Open()
+	if err != nil {
+		return err
+	}
+	defer inFile.Close()
+	
+	outFile, err := os.Create(header.Filename)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	_, err = io.Copy(outFile, inFile)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func shutdown(server *http.Server) {
