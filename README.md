@@ -10,6 +10,12 @@ Why create RUFF when WOOF exists? WOOF is no longer in the debian repos and
 it's easier to `go get` a tool than it is to hunt down Simon's website for
 the latest copy.
 
+Why use RUFF over something like Transfer.sh? Transfer.sh is fantastic for
+sharing files over the net, but you have to upload, wait for that, then wait
+on it to download on the destination. If you're sharing a WiFi network with
+your target device, it's a lot simpler and potentially MUCH faster to skip
+the middle man and chuck your file straight to its new home.
+
 ## Installation
 
 `go get git.tilde.town/diff/ruff`
@@ -23,3 +29,9 @@ Assuming $GOPATH is in $PATH:
 and
 
 `ruff -u # to receive a cool file`
+
+## Screenshots
+
+![RUFF as seen from the terminal](images/ruffterm.png)
+
+![RUFF as seen from a web browser](images/ruffweb.png)
