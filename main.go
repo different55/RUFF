@@ -38,19 +38,12 @@ import (
 
 // Config stores all settings for an instance of RUFF.
 type Config struct {
-	// Number of downloads to allow before exiting.
 	Downloads int
-	// Port to use for the web server.
 	Port      int
-	// Path to the file being sent.
 	FilePath  string
-	// Name of the file being sent.
 	FileName  string
-	// Hide the QR code of the final URL.
 	HideQR    bool
-	// Start RUFF in upload mode, offering up an upload form instead of a file.
 	Uploading bool
-	// Allow uploads with multiple files selected.
 	Multiple  bool
 }
 
@@ -81,7 +74,7 @@ func getConfig() (Config, error) {
 	conf.FileName = path.Base(conf.FilePath)
 
 	if conf.FilePath == "" && !conf.Uploading {
-		return conf, errors.New("no file provided to download")
+		return conf, errors.New("no file provided")
 	}
 
 	return conf, nil
@@ -90,17 +83,16 @@ func getConfig() (Config, error) {
 // getIP uses the net package to try and determine the local address of the
 // device it's running on.
 //
-// Note: no actual connections are made, just prepared.
+// Note: I guess since this is a UDP connection, nothing is actually sent, no
+// connection is established. Target doesn't even need to really exist for us
+// to be able to grab the local address.
 func getIP() (string, error) {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		return "", err
 	}
 
-	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
-	if !ok {
-		return "", err
-	}
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
 	return localAddr.IP.String(), nil
 }
@@ -112,7 +104,7 @@ var done = make(chan struct{})
 func main() {
 	conf, err := getConfig()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("config error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -130,7 +122,7 @@ func main() {
 
 	ip, err := getIP()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("failed to look up local IP: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -145,7 +137,7 @@ func main() {
 
 	err = server.ListenAndServe()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		fmt.Println(err)
+		fmt.Printf("server exited with error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -259,7 +251,9 @@ func setupUpload(server *http.Server, conf Config) {
 			for _, header := range field {
 				// Make sure there's only one file if we only expect one.
 				if len(files) > 0 && !conf.Multiple {
-					tpl.ExecuteTemplate(w, "UploadError", "multiple files found, only expected one file. start RUFF with -m for multiple file uploads.")
+					err := errors.New("multiple files found, only expected one file. start RUFF with -m for multiple file uploads.")
+					tpl.ExecuteTemplate(w, "UploadError", err)
+					fmt.Println(err)
 					return
 				}
 				files = append(files, header)
@@ -270,12 +264,15 @@ func setupUpload(server *http.Server, conf Config) {
 		for i := range files {
 			err := saveFile(files[i])
 			if err != nil {
+				err = fmt.Errorf("could not save file %v: %w", files[i].Filename, err)
 				tpl.ExecuteTemplate(w, "UploadError", err)
+				fmt.Println(err)
 				return
 			}
 		}
 
 		tpl.ExecuteTemplate(w, "UploadMessage", "Upload successful!")
+		fmt.Println("upload successful")
 		go shutdown(server)
 	})
 }
@@ -284,7 +281,7 @@ func setupUpload(server *http.Server, conf Config) {
 func saveFile(header *multipart.FileHeader) error {
 	inFile, err := header.Open()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not open uploaded file: %w", err)
 	}
 	defer inFile.Close()
 
@@ -292,13 +289,15 @@ func saveFile(header *multipart.FileHeader) error {
 	// TODO: This might fail if the file already exists, we should handle this
 	// case specially.
 	if err != nil {
-		return err
+		return fmt.Errorf("could not save uploaded file: %w", err)
 	}
 	defer outFile.Close()
 
+	// TODO: If the file is large enough to be dumped to disk, we could assert it
+	// as an os.File and move the file itself rather than copying it bit by bit.
 	_, err = io.Copy(outFile, inFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not copy uploaded file to disk: %w", err)
 	}
 
 	fmt.Printf("Received file: %v\n", header.Filename)
